@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Birthday Connections Puzzle</title>
+<style>
+  :root {
+    --bg: #fffef8;
+    --tile: #efefe6;
+    --tile-selected: #5a594e;
+    --text: #1f1f1f;
+    --muted: #666;
+    --border: #d8d6c9;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: Arial, Helvetica, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    justify-content: center;
+    padding: 24px 12px;
+  }
+  main {
+    width: min(720px, 100%);
+    text-align: center;
+  }
+  h1 {
+    margin: 8px 0 4px;
+    font-size: clamp(28px, 5vw, 42px);
+    letter-spacing: -0.03em;
+  }
+  .subtitle {
+    margin: 0 0 22px;
+    color: var(--muted);
+    font-size: 16px;
+  }
+  .solved-area {
+    display: grid;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .solved {
+    border-radius: 8px;
+    padding: 14px 10px;
+    font-weight: 700;
+    border: 1px solid rgba(0,0,0,.08);
+  }
+  .solved .cat {
+    font-size: 15px;
+    margin-bottom: 5px;
+  }
+  .solved .items {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: .02em;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin: 0 auto 18px;
+  }
+  button.tile {
+    min-height: 82px;
+    border: 0;
+    border-radius: 8px;
+    background: var(--tile);
+    color: var(--text);
+    font-weight: 800;
+    font-size: clamp(11px, 2.2vw, 15px);
+    line-height: 1.15;
+    padding: 8px;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: transform .08s ease, background .08s ease, color .08s ease;
+  }
+  button.tile:active { transform: scale(.98); }
+  button.tile.selected {
+    background: var(--tile-selected);
+    color: white;
+  }
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    margin: 10px 0;
+  }
+  .controls button {
+    border: 1px solid #111;
+    border-radius: 999px;
+    padding: 11px 18px;
+    background: white;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .controls button.primary {
+    background: #111;
+    color: white;
+  }
+  .status {
+    min-height: 28px;
+    font-weight: 700;
+    margin: 10px 0;
+  }
+  .mistakes {
+    color: var(--muted);
+    margin: 8px 0 18px;
+  }
+  .tiny {
+    color: var(--muted);
+    font-size: 13px;
+    margin-top: 22px;
+  }
+  @media (max-width: 520px) {
+    .grid { gap: 6px; }
+    button.tile { min-height: 68px; padding: 6px; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>Connections</h1>
+  <p class="subtitle">Happy Birthday! Find four groups of four.</p>
+
+  <section id="solvedArea" class="solved-area"></section>
+  <section id="grid" class="grid"></section>
+
+  <div class="status" id="status"></div>
+  <div class="mistakes" id="mistakes">Mistakes remaining: ● ● ● ●</div>
+
+  <div class="controls">
+    <button type="button" id="shuffleBtn">Shuffle</button>
+    <button type="button" id="deselectBtn">Deselect all</button>
+    <button type="button" class="primary" id="submitBtn">Submit</button>
+  </div>
+
+  <p class="tiny">Made just for Mom’s 70th.</p>
+</main>
+
+<script>
+const GROUPS = [{"category": "PILLARS OF A MEDITERRANEAN VACATION", "words": ["CHARLES", "MIRACLE", "WAREHOUSE", "THANKS, GOD"], "color": "#f9df6d"}, {"category": "KITCHEN OFFENSE", "words": ["WATER DROPS", "CRUMBS", "CHEWING NOISES", "FINGERPRINTS"], "color": "#a0c35a"}, {"category": "THINGS WRITTEN IN SHARPIE", "words": ["POEM WRITTEN ON A CAST", "THE PRICE", "THE DISCOUNT", "MARK INSIDE OF A FRIDGE"], "color": "#b0c4ef"}, {"category": "FIRST WORD OF MARIE VERONIQUE PRODUCTS", "words": ["BALANCING", "PROTECTIVE", "REJUVENATING", "MULTI"], "color": "#ba81c5"}];
+let remaining = ["CHARLES", "MULTI", "PROTECTIVE", "POEM WRITTEN ON A CAST", "REJUVENATING", "THE PRICE", "CHEWING NOISES", "THE DISCOUNT", "MIRACLE", "CRUMBS", "WAREHOUSE", "BALANCING", "FINGERPRINTS", "MARK INSIDE OF A FRIDGE", "WATER DROPS", "THANKS, GOD"];
+let solved = [];
+let selected = [];
+let mistakesRemaining = 4;
+
+const grid = document.getElementById('grid');
+const solvedArea = document.getElementById('solvedArea');
+const statusEl = document.getElementById('status');
+const mistakesEl = document.getElementById('mistakes');
+
+function normalize(s) { return s.toUpperCase(); }
+
+function render() {
+  solvedArea.innerHTML = '';
+  solved.forEach(group => {
+    const div = document.createElement('div');
+    div.className = 'solved';
+    div.style.background = group.color;
+    div.innerHTML = `<div class="cat">${group.category}</div><div class="items">${group.words.join(' · ')}</div>`;
+    solvedArea.appendChild(div);
+  });
+
+  grid.innerHTML = '';
+  remaining.forEach(word => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'tile' + (selected.includes(word) ? ' selected' : '');
+    btn.textContent = word;
+    btn.onclick = () => toggle(word);
+    grid.appendChild(btn);
+  });
+
+  mistakesEl.textContent = 'Mistakes remaining: ' + '● '.repeat(Math.max(0, mistakesRemaining)).trim();
+}
+
+function toggle(word) {
+  if (selected.includes(word)) {
+    selected = selected.filter(w => w !== word);
+  } else {
+    if (selected.length >= 4) return;
+    selected.push(word);
+  }
+  statusEl.textContent = '';
+  render();
+}
+
+function arraysEqualAsSets(a, b) {
+  const A = a.map(normalize).sort();
+  const B = b.map(normalize).sort();
+  return A.length === B.length && A.every((v, i) => v === B[i]);
+}
+
+function submit() {
+  if (selected.length !== 4) {
+    statusEl.textContent = 'Select exactly 4 items.';
+    return;
+  }
+
+  const match = GROUPS.find(g => !solved.includes(g) && arraysEqualAsSets(selected, g.words));
+  if (match) {
+    solved.push(match);
+    remaining = remaining.filter(w => !selected.includes(w));
+    selected = [];
+    statusEl.textContent = solved.length === 4 ? 'You solved it! Happy birthday!' : 'Correct!';
+    render();
+    return;
+  }
+
+  const unsolvedGroups = GROUPS.filter(g => !solved.includes(g));
+  const oneAway = unsolvedGroups.some(g => selected.filter(w => g.words.includes(w)).length === 3);
+  mistakesRemaining -= 1;
+  statusEl.textContent = oneAway ? 'One away...' : 'Not quite.';
+  selected = [];
+
+  if (mistakesRemaining <= 0) {
+    statusEl.textContent = 'Game over — revealing the answers.';
+    GROUPS.forEach(g => { if (!solved.includes(g)) solved.push(g); });
+    remaining = [];
+  }
+  render();
+}
+
+function shuffleRemaining() {
+  for (let i = remaining.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [remaining[i], remaining[j]] = [remaining[j], remaining[i]];
+  }
+  selected = [];
+  statusEl.textContent = '';
+  render();
+}
+
+document.getElementById('submitBtn').onclick = submit;
+document.getElementById('shuffleBtn').onclick = shuffleRemaining;
+document.getElementById('deselectBtn').onclick = () => {
+  selected = [];
+  statusEl.textContent = '';
+  render();
+};
+
+render();
+</script>
+</body>
+</html>
